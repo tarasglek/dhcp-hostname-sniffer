@@ -1,4 +1,4 @@
-module github.com/simeonmiteff/option82.git
+module github.com/tarasglek/dhcp-hostname-sniffer
 
 go 1.19
 
