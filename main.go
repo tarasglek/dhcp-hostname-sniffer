@@ -1,8 +1,8 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
+	"sync"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"log/syslog"
 	"os"
 	"os/signal"
 	"strconv"
@@ -27,14 +26,11 @@ func main() {
 	srcInt := flag.String("i", "", "Capture interface")
 	outFile := flag.String("o", "",
 		"Log file (messages go to stdout if absent)")
-	enableSyslog := flag.Bool("s", false,
-		"Output option 82 data to syslog instead of log file or stdout")
 	pidFile := flag.String("p", "", "PID file (optional)")
 
 	flag.Parse()
 
 	var handle *pcap.Handle = nil
-	var sysLog *syslog.Writer = nil
 	if *srcFile != "" && *srcInt != "" {
 		log.Fatal("Cannot input from file and network at the same time")
 	} else if *srcFile != "" {
@@ -73,20 +69,18 @@ func main() {
 		log.SetOutput(os.Stdout)
 	}
 
-	if *enableSyslog {
-		var err error = nil
-		sysLog, err = syslog.Dial("", "", syslog.LOG_LOCAL0, "option82")
-		if err != nil {
-			log.Fatalf("Unable to connect to syslog: %s", err)
-		}
-	}
-
 	if *pidFile != "" {
 		err := writePidFile(*pidFile)
 		if err != nil {
 			log.Fatalf("Problem writing pid file: %s", err)
 		}
 	}
+
+	var wg sync.WaitGroup
+	mapChan := make(chan map[string]interface{})
+
+	wg.Add(1)
+	go metricsLoop(mapChan, &wg)
 
 	// TODO: Should be possible to override BPF rule with a flag
 	if err := handle.SetBPFFilter("port 67 or port 68 and udp"); err != nil {
@@ -96,24 +90,17 @@ func main() {
 		for packet := range packetSource.Packets() {
 			result, hasHostname := HandlePacket(packet)
 			if hasHostname {
-				hasMetrics := false
-				if client_ip, ok := (*result)["client_ip"].(string); ok {
-					hasMetrics = discoverPrometheusEndpoint(client_ip)
-					(*result)["has_metrics"] = hasMetrics
-				}
-				enc, err := json.Marshal(*result)
-				if err != nil {
-					log.Fatalf("Could not marshal JSON: %s", err)
-				}
-				if *enableSyslog {
-					sysLog.Info(string(enc))
-				} else {
-					log.Println(string(enc))
-				}
-
+				mapChan <- *result
+				// hasMetrics := false
+				// if client_ip, ok := (*result)["client_ip"].(string); ok {
+				// 	hasMetrics = discoverPrometheusEndpoint(client_ip)
+				// 	(*result)["has_metrics"] = hasMetrics
+				// }
 			}
 		}
 	}
+	close(mapChan)
+	wg.Wait()
 }
 
 // Write a pid file, but first make sure it doesn't exist with a running pid.

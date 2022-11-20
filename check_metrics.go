@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -20,4 +23,16 @@ func discoverPrometheusEndpoint(ip string) bool {
 		return false
 	}
 	return true
+}
+
+func metricsLoop(ch <-chan map[string]interface{}, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for record := range ch {
+		enc, err := json.Marshal(record)
+		if err != nil {
+			log.Fatalf("Could not marshal JSON: %s", err)
+		}
+		log.Println(string(enc))
+	}
+
 }
