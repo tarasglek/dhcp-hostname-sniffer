@@ -3,11 +3,11 @@ package main
 import (
 	"encoding/json"
 	"flag"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 
 	"fmt"
-	"github.com/client9/reopen"
 	"io/ioutil"
 	"log"
 	"log/syslog"
@@ -15,6 +15,8 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+
+	"github.com/client9/reopen"
 )
 
 // The option82 program reads DHCPv4 packets via libpcap (network or file input)
@@ -33,7 +35,6 @@ func main() {
 
 	var handle *pcap.Handle = nil
 	var sysLog *syslog.Writer = nil
-
 	if *srcFile != "" && *srcInt != "" {
 		log.Fatal("Cannot input from file and network at the same time")
 	} else if *srcFile != "" {
@@ -88,7 +89,7 @@ func main() {
 	}
 
 	// TODO: Should be possible to override BPF rule with a flag
-	if err := handle.SetBPFFilter("udp src and dst port 67"); err != nil {
+	if err := handle.SetBPFFilter("port 67 or port 68 and udp"); err != nil {
 		log.Fatalf("Unable to set BPF: %s", err)
 	} else {
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())

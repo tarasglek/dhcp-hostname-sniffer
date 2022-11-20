@@ -3,8 +3,8 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"net"
 	"log"
+	"net"
 
 	"encoding/binary"
 	"encoding/hex"
@@ -117,7 +117,7 @@ func (o Suboption) PopulateMap(work map[string]interface{}) {
 				err := binary.Read(buf, binary.BigEndian, &c)
 				if err != nil {
 					// TODO: most likely a bug, but should we try to recover?
-					log.Fatalf("Could not convert buffer to struct: %s",err) 
+					log.Fatalf("Could not convert buffer to struct: %s", err)
 				}
 				result["option_structure"] = "cisco_vlan_mod_port"
 				result["cisco_vlan_mod_port"] = c
@@ -160,16 +160,20 @@ func (o Suboption) PopulateMap(work map[string]interface{}) {
 func HandlePacket(packet gopacket.Packet) (*map[string]interface{}, bool) {
 	dhcp, ok := packet.Layer(layers.LayerTypeDHCPv4).(*layers.DHCPv4)
 	result := make(map[string]interface{})
-	hasOption82 := false
+	hasOption12 := false
 	if ok && dhcp.Operation == 1 {
 		for _, opt := range dhcp.Options {
-			if opt.Type == 82 {
-				hasOption82 = true
+			//console log type
+			// log.Printf("dhcp opt:%d ip:%v\n", opt.Type, dhcp.ClientIP)
+			// printf clientip
+
+			if opt.Type == 12 {
+				hasOption12 = true
 				break
 			}
 
 		}
-		if hasOption82 {
+		if hasOption12 {
 			var mac net.HardwareAddr = dhcp.ClientHWAddr
 			var ip net.IP = dhcp.ClientIP
 			result["client_mac"] = fmt.Sprintf("%v", mac)
@@ -201,5 +205,5 @@ func HandlePacket(packet gopacket.Packet) (*map[string]interface{}, bool) {
 			}
 		}
 	}
-	return &result, hasOption82
+	return &result, hasOption12
 }
