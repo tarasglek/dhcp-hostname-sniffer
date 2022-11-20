@@ -94,8 +94,13 @@ func main() {
 	} else {
 		packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 		for packet := range packetSource.Packets() {
-			result, hasOption82 := HandlePacket(packet)
-			if hasOption82 {
+			result, hasHostname := HandlePacket(packet)
+			if hasHostname {
+				hasMetrics := false
+				if client_ip, ok := (*result)["client_ip"].(string); ok {
+					hasMetrics = discoverPrometheusEndpoint(client_ip)
+					(*result)["has_metrics"] = hasMetrics
+				}
 				enc, err := json.Marshal(*result)
 				if err != nil {
 					log.Fatalf("Could not marshal JSON: %s", err)
