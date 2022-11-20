@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 )
@@ -13,13 +14,14 @@ func discoverPrometheusEndpoint(ip string) bool {
 	client := http.Client{
 		Timeout: 1000 * time.Millisecond,
 	}
-	resp, err := client.Get("http://" + ip + "/metrics")
+	url := "http://" + ip + "/metrics"
+	resp, err := client.Get(url)
 	if err != nil {
-		fmt.Println("Error reaching out to endpoint " + ip + ": " + err.Error())
+		fmt.Fprintln(os.Stderr, "Error reaching out to endpoint "+ip+": "+err.Error())
 		return false
 	}
 	if resp.StatusCode != 200 {
-		fmt.Println("Endpoint not a valid prometheus endpoint")
+		fmt.Fprintln(os.Stderr, url+" not a valid prometheus endpoint")
 		return false
 	}
 	return true
@@ -28,6 +30,10 @@ func discoverPrometheusEndpoint(ip string) bool {
 func metricsLoop(ch <-chan map[string]interface{}, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for record := range ch {
+		if client_ip, ok := record["client_ip"].(string); ok {
+			hasMetrics := discoverPrometheusEndpoint(client_ip)
+			record["has_metrics"] = hasMetrics
+		}
 		enc, err := json.Marshal(record)
 		if err != nil {
 			log.Fatalf("Could not marshal JSON: %s", err)
