@@ -77,7 +77,7 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
-	mapChan := make(chan map[string]interface{})
+	mapChan := make(chan map[string]interface{}, 1000)
 
 	wg.Add(1)
 	go metricsLoop(mapChan, &wg)
@@ -100,6 +100,7 @@ func main() {
 		}
 	}
 	close(mapChan)
+	fmt.Println("Waiting for metricsLoop to finish")
 	wg.Wait()
 }
 
